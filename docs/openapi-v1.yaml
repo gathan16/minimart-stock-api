@@ -1,0 +1,222 @@
+openapi: 3.0.3
+info:
+  title: MiniMart Stock API
+  description: API pengelolaan stok minimarket.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: API Gateway (lokal)
+paths:
+  /api/v1/products:
+    get:
+      summary: Ambil daftar produk
+      tags: [Products]
+      responses:
+        '200':
+          description: Daftar produk berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+    post:
+      summary: Tambah produk baru
+      tags: [Products]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: Produk berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Data permintaan tidak valid
+  /api/v1/products/{id}:
+    get:
+      summary: Ambil detail produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Detail produk
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Produk tidak ditemukan
+    put:
+      summary: Ganti seluruh data produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: Produk berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Data permintaan tidak valid
+        '404':
+          description: Produk tidak ditemukan
+    patch:
+      summary: Ubah sebagian data produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPatchRequest'
+      responses:
+        '200':
+          description: Produk berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Data permintaan tidak valid
+        '404':
+          description: Produk tidak ditemukan
+    delete:
+      summary: Hapus produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '204':
+          description: Produk berhasil dihapus
+        '404':
+          description: Produk tidak ditemukan
+        '409':
+          description: Produk masih memiliki stok
+  /api/v1/stock-movements:
+    get:
+      summary: Ambil riwayat pergerakan stok
+      tags: [Stock Movements]
+      responses:
+        '200':
+          description: Riwayat pergerakan stok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockMovement'
+    post:
+      summary: Catat stok masuk atau keluar
+      tags: [Stock Movements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockMovementRequest'
+      responses:
+        '201':
+          description: Pergerakan stok berhasil dicatat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovement'
+        '400':
+          description: Data permintaan tidak valid
+        '404':
+          description: Produk tidak ditemukan
+        '409':
+          description: Stok tidak mencukupi
+components:
+  parameters:
+    ProductId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  schemas:
+    ProductRequest:
+      type: object
+      required: [name, category, price]
+      properties:
+        name:
+          type: string
+          example: Mie Instan Goreng
+        category:
+          type: string
+          example: Makanan
+        price:
+          type: number
+          format: double
+          minimum: 0
+          example: 3500
+    ProductPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+          format: double
+          minimum: 0
+          example: 4000
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductRequest'
+        - type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+              example: 1
+            stock:
+              type: integer
+              example: 120
+    StockMovementRequest:
+      type: object
+      required: [productId, type, quantity]
+      properties:
+        productId:
+          type: integer
+          format: int64
+          example: 1
+        type:
+          type: string
+          enum: [IN, OUT]
+        quantity:
+          type: integer
+          minimum: 1
+          example: 10
+    StockMovement:
+      allOf:
+        - $ref: '#/components/schemas/StockMovementRequest'
+        - type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            createdAt:
+              type: string
+              format: date-time
