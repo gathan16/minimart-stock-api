@@ -1,0 +1,533 @@
+openapi: 3.0.3
+info:
+  title: MiniMart Stock API
+  description: API pengelolaan stok minimarket, versi 2.0.
+  version: 2.0.0
+
+servers:
+  - url: http://{host}
+    description: Istio Ingress Gateway (minikube)
+    variables:
+      host:
+        default: localhost:8080
+
+tags:
+  - name: Products
+    description: Pengelolaan data master produk
+  - name: Stock Movements
+    description: Pencatatan pergerakan stok (hanya tambah, tidak dapat diubah)
+
+paths:
+  /api/v2/products:
+    get:
+      summary: Ambil daftar produk (berhalaman)
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: sort
+          in: query
+          description: "Format `field,arah`. Field: id, name, price, stock, createdAt."
+          schema:
+            type: string
+            default: id,asc
+            example: price,desc
+        - name: category
+          in: query
+          schema:
+            type: string
+            example: Minuman
+        - name: q
+          in: query
+          description: Cari berdasarkan nama produk (mengandung teks).
+          schema:
+            type: string
+            example: susu
+        - name: lowStock
+          in: query
+          description: "true = hanya produk dengan stock <= minStock."
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, ARCHIVED, ALL]
+            default: ACTIVE
+      responses:
+        '200':
+          description: Daftar produk berhasil diambil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      summary: Tambah produk baru
+      tags: [Products]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: Produk berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v2/products/{id}:
+    get:
+      summary: Ambil detail produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Detail produk
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      summary: Ganti seluruh data produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: Produk berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    patch:
+      summary: Ubah sebagian data produk
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPatchRequest'
+      responses:
+        '200':
+          description: Produk berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      summary: Arsipkan produk (soft delete)
+      description: >
+        Mengubah status produk menjadi ARCHIVED. Ditolak dengan 409
+        jika stok masih lebih dari nol.
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '204':
+          description: Produk berhasil diarsipkan
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v2/products/{id}/restore:
+    post:
+      summary: Pulihkan produk yang diarsipkan
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Produk berhasil dipulihkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v2/stock-movements:
+    get:
+      summary: Ambil riwayat pergerakan stok (berhalaman)
+      tags: [Stock Movements]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: sort
+          in: query
+          description: "Format `field,arah`. Field: id, quantity, createdAt."
+          schema:
+            type: string
+            default: createdAt,desc
+        - name: productId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [IN, OUT]
+        - name: from
+          in: query
+          description: Batas awal waktu pencatatan (inklusif).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Batas akhir waktu pencatatan (inklusif).
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Riwayat pergerakan stok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovementPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      summary: Catat stok masuk atau keluar
+      tags: [Stock Movements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockMovementRequest'
+      responses:
+        '201':
+          description: Pergerakan stok berhasil dicatat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v2/stock-movements/{id}:
+    get:
+      summary: Ambil detail pergerakan stok
+      tags: [Stock Movements]
+      parameters:
+        - $ref: '#/components/parameters/MovementId'
+      responses:
+        '200':
+          description: Detail pergerakan stok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovement'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    ProductId:
+      name: id
+      in: path
+      required: true
+      description: ID produk
+      schema:
+        type: integer
+        format: int64
+        example: 1
+    MovementId:
+      name: id
+      in: path
+      required: true
+      description: ID pergerakan stok
+      schema:
+        type: integer
+        format: int64
+        example: 42
+    Page:
+      name: page
+      in: query
+      description: Nomor halaman (dimulai dari 0)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      description: Jumlah data per halaman
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Permintaan tidak valid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: Validasi gagal
+            instance: /api/v2/products
+            timestamp: '2026-05-10T09:30:00Z'
+            errors:
+              - field: price
+                message: Harga tidak boleh bernilai negatif
+    NotFound:
+      description: Sumber daya tidak ditemukan
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Not Found
+            status: 404
+            detail: Produk dengan id 999999 tidak ditemukan
+            instance: /api/v2/products/999999
+            timestamp: '2026-05-10T09:30:00Z'
+    Conflict:
+      description: Permintaan bertentangan dengan keadaan data saat ini
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: about:blank
+            title: Conflict
+            status: 409
+            detail: Produk masih memiliki stok
+            instance: /api/v2/products/1
+            timestamp: '2026-05-10T09:30:00Z'
+
+  schemas:
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          example: about:blank
+        title:
+          type: string
+          example: Bad Request
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: Validasi gagal
+        instance:
+          type: string
+          example: /api/v2/products
+        timestamp:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          description: Daftar galat per field (hanya untuk kesalahan validasi)
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+          example: price
+        message:
+          type: string
+          example: Harga tidak boleh bernilai negatif
+
+    ProductRequest:
+      type: object
+      required: [name, category, price]
+      properties:
+        name:
+          type: string
+          example: Susu UHT
+        category:
+          type: string
+          example: Minuman
+        price:
+          type: number
+          format: double
+          minimum: 0
+          example: 6000
+        minStock:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Ambang batas stok menipis
+          example: 5
+
+    ProductPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+          format: double
+          minimum: 0
+        minStock:
+          type: integer
+          minimum: 0
+
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductRequest'
+        - type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+              readOnly: true
+              example: 1
+            stock:
+              type: integer
+              readOnly: true
+              example: 3
+            lowStock:
+              type: boolean
+              readOnly: true
+              description: true jika stock <= minStock
+              example: true
+            status:
+              type: string
+              enum: [ACTIVE, ARCHIVED]
+              readOnly: true
+              example: ACTIVE
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+            updatedAt:
+              type: string
+              format: date-time
+              readOnly: true
+
+    ProductPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 57
+        totalPages:
+          type: integer
+          example: 3
+
+    StockMovementRequest:
+      type: object
+      required: [productId, type, quantity]
+      properties:
+        productId:
+          type: integer
+          format: int64
+          example: 1
+        type:
+          type: string
+          enum: [IN, OUT]
+          example: OUT
+        quantity:
+          type: integer
+          minimum: 1
+          example: 5
+        note:
+          type: string
+          maxLength: 255
+          example: Penjualan kasir 1
+
+    StockMovement:
+      allOf:
+        - $ref: '#/components/schemas/StockMovementRequest'
+        - type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+              readOnly: true
+              example: 42
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+              example: '2026-05-10T09:30:00Z'
+
+    StockMovementPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovement'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 120
+        totalPages:
+          type: integer
+          example: 6

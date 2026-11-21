@@ -3,6 +3,7 @@ package com.minimart.service;
 import com.minimart.dto.ProductPatchRequest;
 import com.minimart.dto.ProductRequest;
 import com.minimart.model.Product;
+import com.minimart.model.ProductStatus;
 import com.minimart.repository.ProductRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Service untuk API v1.0. Produk yang diarsipkan lewat v2.0 dianggap
+ * "tidak ada" oleh v1.0, dan DELETE v1.0 tetap menghapus secara permanen.
+ */
 @Service
 public class ProductService {
 
@@ -23,11 +28,12 @@ public class ProductService {
     // ---- GET dan POST (2.2.1) ----
 
     public List<Product> findAll() {
-        return productRepository.findAll();
+        return productRepository.findByStatus(ProductStatus.ACTIVE);
     }
 
     public Product findById(Long id) {
         return productRepository.findById(id)
+            .filter(p -> p.getStatus() == ProductStatus.ACTIVE)
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "Produk tidak ditemukan"));
     }

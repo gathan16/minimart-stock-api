@@ -1,5 +1,6 @@
 package com.minimart.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.minimart.dto.MovementType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -33,6 +34,10 @@ public class StockMovement {
     @Column(nullable = false)
     private OffsetDateTime createdAt;
 
+    // kolom baru untuk v2.0 (opsional, tidak ditampilkan pada JSON v1)
+    @Column(length = 255)
+    private String note;
+
     public StockMovement() {}
 
     public Long getId() { return id; }
@@ -49,4 +54,8 @@ public class StockMovement {
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+    @JsonIgnore
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
 }

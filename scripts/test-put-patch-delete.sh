@@ -35,9 +35,19 @@ check() {
 }
 
 check_json() {
-  local actual
+  local actual ok=0
   actual=$(echo "$BODY" | jq -r "$2" 2>/dev/null)
-  if [[ "$actual" == "$3" ]]; then
+  local num='^-?[0-9]+([.][0-9]+)?$'
+
+  if [[ "$3" =~ $num && "$actual" =~ $num ]]; then
+    # kedua nilai angka: bandingkan secara numerik (5000 == 5000.0)
+    [[ "$(jq -n --argjson a "$actual" --argjson b "$3" '$a == $b')" == "true" ]] && ok=1
+  else
+    # selain angka: bandingkan sebagai teks
+    [[ "$actual" == "$3" ]] && ok=1
+  fi
+
+  if [[ "$ok" -eq 1 ]]; then
     echo "  [PASS] $1 ($2 = $actual)"; PASS=$((PASS + 1))
   else
     echo "  [FAIL] $1 ($2 diharapkan '$3', didapat '$actual')"; FAIL=$((FAIL + 1))

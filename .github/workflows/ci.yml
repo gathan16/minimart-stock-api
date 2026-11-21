@@ -2,11 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
+defaults:
+  run:
+    working-directory: .
+
 jobs:
-  build-test:
+  test:
+    name: Build dan test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,5 +23,71 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Build dan test
+      - name: Build dan test (JUnit + MockMvc, basis data H2)
         run: mvn -B verify
+
+      - name: Unggah laporan pengujian
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: ./target/surefire-reports
+
+  smoke:
+    name: Uji asap API v2 (curl + jq)
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/minimart
+      DB_USERNAME: minimart
+      DB_PASSWORD: minimart
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: minimart
+          POSTGRES_USER: minimart
+          POSTGRES_PASSWORD: minimart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U minimart"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Package
+        run: mvn -B -DskipTests package
+
+      - name: Jalankan API
+        run: |
+          nohup java -jar target/minimart-stock-api-*.jar > app.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:8080/v3/api-docs/v2 >/dev/null; then
+              echo "API siap"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "API tidak kunjung siap"
+          cat app.log
+          exit 1
+
+      - name: Uji GET dan POST
+        run: bash scripts/test-v2-get-post.sh
+
+      - name: Uji PUT, PATCH, dan DELETE
+        run: bash scripts/test-v2-put-patch-delete.sh
+
+      - name: Tampilkan log aplikasi bila gagal
+        if: failure()
+        run: cat app.log

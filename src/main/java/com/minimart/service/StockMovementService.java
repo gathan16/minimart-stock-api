@@ -3,6 +3,7 @@ package com.minimart.service;
 import com.minimart.dto.MovementType;
 import com.minimart.dto.StockMovementRequest;
 import com.minimart.model.Product;
+import com.minimart.model.ProductStatus;
 import com.minimart.model.StockMovement;
 import com.minimart.repository.ProductRepository;
 import com.minimart.repository.StockMovementRepository;
@@ -14,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+/** Service untuk API v1.0. */
 @Service
 public class StockMovementService {
 
@@ -33,6 +35,7 @@ public class StockMovementService {
     @Transactional
     public StockMovement recordMovement(StockMovementRequest request) {
         Product product = productRepository.findById(request.productId())
+            .filter(p -> p.getStatus() == ProductStatus.ACTIVE)
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "Produk tidak ditemukan"));
 

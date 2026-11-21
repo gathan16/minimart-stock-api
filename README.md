@@ -35,3 +35,18 @@ bash scripts/test-put-patch-delete.sh # curl, API harus sudah berjalan
 
 Skrip curl membutuhkan `curl` dan `jq`. Alamat dasar dapat diubah dengan
 `BASE_URL=http://host:port bash scripts/test-get-post.sh`.
+
+## API v2.0
+
+API v2.0 berjalan berdampingan dengan v1.0 (awalan `/api/v2`). Perubahan utama:
+paginasi, filter, dan pengurutan pada daftar; *soft delete* (arsip) dan *restore*
+produk; ambang stok menipis (`minStock`, `lowStock`); format galat seragam
+`application/problem+json`. Spesifikasi: `docs/openapi-v2.yaml`.
+
+- Swagger UI: http://localhost:8080/swagger-ui.html (pilih "API v2.0" atau "API v1.0")
+
+```bash
+mvn test                                   # semua pengujian JUnit (v1 dan v2)
+bash scripts/test-v2-get-post.sh           # curl, API harus sudah berjalan
+bash scripts/test-v2-put-patch-delete.sh   # curl, API harus sudah berjalan
+```
